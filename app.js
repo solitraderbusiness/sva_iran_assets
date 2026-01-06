@@ -4,6 +4,8 @@
 const CONFIG = {
     CVD_API_URL: 'http://31.97.32.203:5000',  // Your CVD data server
     USE_REAL_CVD: true,  // Set to false to use estimated CVD
+    AUTO_REFRESH: true,  // Auto-refresh chart data
+    REFRESH_INTERVAL: 10000,  // Refresh every 10 seconds (10000ms)
 };
 
 class TradingChart {
@@ -18,6 +20,8 @@ class TradingChart {
         this.candleData = [];
         this.cvdData = [];
         this.useRealCVD = CONFIG.USE_REAL_CVD;
+        this.refreshInterval = null;
+        this.isLoading = false;
 
         this.init();
     }
@@ -26,6 +30,11 @@ class TradingChart {
         this.createChart();
         this.setupEventListeners();
         this.loadData();
+
+        // Start auto-refresh if enabled
+        if (CONFIG.AUTO_REFRESH) {
+            this.startAutoRefresh();
+        }
     }
 
     createChart() {
@@ -707,6 +716,76 @@ hline(0, color=color.gray, linestyle=hline.style_dashed)`;
         const statusEl = document.getElementById('editorStatus');
         statusEl.textContent = message;
         statusEl.className = `status-message ${type}`;
+    }
+
+    startAutoRefresh() {
+        console.log(`Auto-refresh enabled: updating every ${CONFIG.REFRESH_INTERVAL / 1000} seconds`);
+
+        this.refreshInterval = setInterval(async () => {
+            if (!this.isLoading) {
+                console.log('Auto-refreshing data...');
+                await this.refreshData();
+            }
+        }, CONFIG.REFRESH_INTERVAL);
+    }
+
+    stopAutoRefresh() {
+        if (this.refreshInterval) {
+            clearInterval(this.refreshInterval);
+            this.refreshInterval = null;
+            console.log('Auto-refresh stopped');
+        }
+    }
+
+    async refreshData() {
+        if (this.isLoading) {
+            console.log('Already loading, skipping refresh');
+            return;
+        }
+
+        try {
+            this.isLoading = true;
+
+            // Fetch latest price data
+            const to = Math.floor(Date.now() / 1000);
+            const intervalSeconds = this.getIntervalSeconds();
+            const from = to - (200 * intervalSeconds);
+
+            const resolutionMap = {
+                '1m': '1',
+                '5m': '5',
+                '15m': '15',
+                '1h': '60',
+                '4h': '240',
+                '1d': 'D'
+            };
+            const resolution = resolutionMap[this.timeframe] || '15';
+
+            const url = `https://apiv2.nobitex.ir/market/udf/history?symbol=USDTIRT&resolution=${resolution}&from=${from}&to=${to}`;
+
+            const response = await fetch(url);
+
+            if (response.ok) {
+                const data = await response.json();
+
+                if (data.s === 'ok' && data.t && data.t.length > 0) {
+                    // Update candle data
+                    this.processRealData(data);
+
+                    // Refresh CVD if enabled
+                    if (this.useRealCVD) {
+                        await this.loadRealCVD();
+                    }
+
+                    console.log('Data refreshed successfully');
+                }
+            }
+
+        } catch (error) {
+            console.error('Error refreshing data:', error);
+        } finally {
+            this.isLoading = false;
+        }
     }
 }
 

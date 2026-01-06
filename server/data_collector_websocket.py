@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 
 # Configuration
 DB_PATH = '/var/lib/sva_iran_assets/cvd_data.db'
-WEBSOCKET_URL = 'wss://api.nobitex.ir/ws'
+WEBSOCKET_URL = 'wss://apiv2.nobitex.ir/ws'  # Try the API v2 domain
 UPDATE_INTERVAL = 10  # Aggregate and store every 10 seconds
 
 class CVDWebSocketCollector:

@@ -215,15 +215,16 @@ def main():
             if int(time.time()) % 3600 == 0:
                 cleanup_old_data()
 
-            # Wait 60 seconds before next collection
-            time.sleep(60)
+            # Wait 10 seconds before next collection (for real-time updates)
+            # Note: Nobitex limit is 60/minute, so 10 seconds is safe
+            time.sleep(10)
 
         except KeyboardInterrupt:
             logger.info("Shutting down gracefully...")
             break
         except Exception as e:
             logger.error(f"Unexpected error: {e}", exc_info=True)
-            time.sleep(60)  # Wait before retrying
+            time.sleep(10)  # Wait before retrying
 
 if __name__ == '__main__':
     main()

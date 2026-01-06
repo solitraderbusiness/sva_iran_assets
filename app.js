@@ -194,7 +194,17 @@ class TradingChart {
 
                 // Update CVD series if it's currently displayed
                 if (this.cvdEnabled && this.cvdSeries) {
-                    this.cvdSeries.setData(this.cvdData);
+                    // Convert to histogram format
+                    const histogramData = this.cvdData.map((item, index) => {
+                        const prevValue = index > 0 ? this.cvdData[index - 1].value : 0;
+                        const delta = item.value - prevValue;
+                        return {
+                            time: item.time,
+                            value: item.value,
+                            color: delta >= 0 ? '#26a69a' : '#ef5350'
+                        };
+                    });
+                    this.cvdSeries.setData(histogramData);
                 }
 
                 this.setStatus('Real CVD data loaded from server', 'success');
@@ -266,7 +276,17 @@ class TradingChart {
         this.candlestickSeries.setData(this.candleData);
 
         if (this.cvdEnabled && this.cvdSeries) {
-            this.cvdSeries.setData(this.cvdData);
+            // Convert to histogram format
+            const histogramData = this.cvdData.map((item, index) => {
+                const prevValue = index > 0 ? this.cvdData[index - 1].value : 0;
+                const delta = item.value - prevValue;
+                return {
+                    time: item.time,
+                    value: item.value,
+                    color: delta >= 0 ? '#26a69a' : '#ef5350'
+                };
+            });
+            this.cvdSeries.setData(histogramData);
         }
     }
 
@@ -324,7 +344,17 @@ class TradingChart {
         this.candlestickSeries.setData(this.candleData);
 
         if (this.cvdEnabled && this.cvdSeries) {
-            this.cvdSeries.setData(this.cvdData);
+            // Convert to histogram format
+            const histogramData = this.cvdData.map((item, index) => {
+                const prevValue = index > 0 ? this.cvdData[index - 1].value : 0;
+                const delta = item.value - prevValue;
+                return {
+                    time: item.time,
+                    value: item.value,
+                    color: delta >= 0 ? '#26a69a' : '#ef5350'
+                };
+            });
+            this.cvdSeries.setData(histogramData);
         }
     }
 
@@ -355,9 +385,11 @@ class TradingChart {
 
     addCVDIndicator() {
         if (!this.cvdSeries) {
-            this.cvdSeries = this.chart.addLineSeries({
+            this.cvdSeries = this.chart.addHistogramSeries({
                 color: '#2962ff',
-                lineWidth: 2,
+                priceFormat: {
+                    type: 'volume',
+                },
                 priceScaleId: 'cvd',
                 title: 'CVD',
             });
@@ -370,7 +402,20 @@ class TradingChart {
             });
         }
 
-        this.cvdSeries.setData(this.cvdData);
+        // Convert CVD data to histogram format (needs 'value' and optional 'color')
+        const histogramData = this.cvdData.map((item, index) => {
+            // Color bars based on delta (positive = green, negative = red)
+            const prevValue = index > 0 ? this.cvdData[index - 1].value : 0;
+            const delta = item.value - prevValue;
+
+            return {
+                time: item.time,
+                value: item.value,
+                color: delta >= 0 ? '#26a69a' : '#ef5350'
+            };
+        });
+
+        this.cvdSeries.setData(histogramData);
 
         // Indicate if using real or estimated CVD
         const cvdType = this.useRealCVD ? 'CVD (Real)' : 'CVD (Estimated)';

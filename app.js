@@ -160,8 +160,26 @@ class TradingChart {
             const close = parseFloat(data.c[i]);
             const volume = parseFloat(data.v[i] || 0);
 
-            // Calculate volume delta (simplified: positive if close > open, negative otherwise)
-            const volumeDelta = close > open ? volume : -volume;
+            // Calculate volume delta using close position in candle range
+            // This estimates buying vs selling pressure based on where the close is
+            const range = high - low;
+            let volumeDelta = 0;
+
+            if (range > 0) {
+                // Calculate where close is in the range (0 = at low, 1 = at high)
+                const closePosition = (close - low) / range;
+
+                // Split volume based on close position
+                // If close is at high (1.0), all volume is buy
+                // If close is at low (0.0), all volume is sell
+                const buyVolume = volume * closePosition;
+                const sellVolume = volume * (1 - closePosition);
+                volumeDelta = buyVolume - sellVolume;
+            } else {
+                // No range (open = high = low = close), no delta
+                volumeDelta = 0;
+            }
+
             cvd += volumeDelta;
 
             this.candleData.push({

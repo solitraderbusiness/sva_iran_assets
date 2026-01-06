@@ -1,0 +1,463 @@
+// SVA Iran Assets Trading Chart Application
+class TradingChart {
+    constructor() {
+        this.chart = null;
+        this.candlestickSeries = null;
+        this.cvdSeries = null;
+        this.cvdEnabled = false;
+        this.indicators = [];
+        this.currentAsset = 'USDTIRT';
+        this.timeframe = '15m';
+        this.candleData = [];
+        this.cvdData = [];
+
+        this.init();
+    }
+
+    init() {
+        this.createChart();
+        this.setupEventListeners();
+        this.loadData();
+    }
+
+    createChart() {
+        const chartContainer = document.getElementById('chartContainer');
+
+        this.chart = LightweightCharts.createChart(chartContainer, {
+            width: chartContainer.clientWidth,
+            height: chartContainer.clientHeight,
+            layout: {
+                background: { color: '#131722' },
+                textColor: '#d1d4dc',
+            },
+            grid: {
+                vertLines: { color: '#1e222d' },
+                horzLines: { color: '#1e222d' },
+            },
+            crosshair: {
+                mode: LightweightCharts.CrosshairMode.Normal,
+            },
+            rightPriceScale: {
+                borderColor: '#2a2e39',
+            },
+            timeScale: {
+                borderColor: '#2a2e39',
+                timeVisible: true,
+                secondsVisible: false,
+            },
+        });
+
+        this.candlestickSeries = this.chart.addCandlestickSeries({
+            upColor: '#089981',
+            downColor: '#f23645',
+            borderDownColor: '#f23645',
+            borderUpColor: '#089981',
+            wickDownColor: '#f23645',
+            wickUpColor: '#089981',
+        });
+
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            this.chart.applyOptions({
+                width: chartContainer.clientWidth,
+                height: chartContainer.clientHeight,
+            });
+        });
+    }
+
+    setupEventListeners() {
+        document.getElementById('toggleCVD').addEventListener('click', () => {
+            this.toggleCVD();
+        });
+
+        document.getElementById('refreshData').addEventListener('click', () => {
+            this.loadData();
+        });
+
+        document.getElementById('timeframeSelect').addEventListener('change', (e) => {
+            this.timeframe = e.target.value;
+            this.loadData();
+        });
+
+        document.getElementById('runScript').addEventListener('click', () => {
+            this.runPineScript();
+        });
+
+        document.getElementById('loadCVDExample').addEventListener('click', () => {
+            this.loadCVDExample();
+        });
+
+        document.getElementById('clearEditor').addEventListener('click', () => {
+            document.getElementById('pineEditor').value = '';
+            this.setStatus('');
+        });
+    }
+
+    async loadData() {
+        this.setStatus('Loading data...', 'info');
+
+        try {
+            // Try to fetch real data from Nobitex API
+            const response = await fetch('https://apiv2.nobitex.ir/v3/orderbook/USDTIRT');
+
+            if (!response.ok) {
+                throw new Error('API not available');
+            }
+
+            const data = await response.json();
+            this.processRealData(data);
+
+        } catch (error) {
+            console.log('Using mock data (API not available):', error.message);
+            this.generateMockData();
+        }
+
+        this.updatePriceDisplay();
+        this.setStatus('Data loaded successfully', 'success');
+    }
+
+    processRealData(data) {
+        // Process real orderbook data from Nobitex
+        // Note: Orderbook data needs to be converted to candlestick format
+        // For MVP, we'll use the current price to generate candles
+        const currentPrice = parseFloat(data.bids[0]?.price || 1480000);
+        this.generateMockData(currentPrice);
+    }
+
+    generateMockData(basePrice = 1480000) {
+        const now = Date.now() / 1000;
+        const candleCount = 100;
+        const interval = this.getIntervalSeconds();
+
+        this.candleData = [];
+        this.cvdData = [];
+
+        let price = basePrice;
+        let cvd = 0;
+
+        for (let i = candleCount; i >= 0; i--) {
+            const time = now - (i * interval);
+
+            // Generate realistic price movement
+            const change = (Math.random() - 0.48) * (basePrice * 0.002);
+            price = Math.max(price + change, basePrice * 0.95);
+
+            const open = price;
+            const high = price + (Math.random() * basePrice * 0.001);
+            const low = price - (Math.random() * basePrice * 0.001);
+            const close = low + (Math.random() * (high - low));
+
+            // Generate volume (buy and sell)
+            const buyVolume = Math.random() * 1000000;
+            const sellVolume = Math.random() * 1000000;
+            const volume = buyVolume + sellVolume;
+
+            // Calculate CVD
+            const volumeDelta = buyVolume - sellVolume;
+            cvd += volumeDelta;
+
+            this.candleData.push({
+                time: Math.floor(time),
+                open: parseFloat(open.toFixed(0)),
+                high: parseFloat(high.toFixed(0)),
+                low: parseFloat(low.toFixed(0)),
+                close: parseFloat(close.toFixed(0)),
+                volume: parseFloat(volume.toFixed(0)),
+                buyVolume: parseFloat(buyVolume.toFixed(0)),
+                sellVolume: parseFloat(sellVolume.toFixed(0)),
+            });
+
+            this.cvdData.push({
+                time: Math.floor(time),
+                value: cvd,
+            });
+
+            price = close;
+        }
+
+        this.candlestickSeries.setData(this.candleData);
+
+        if (this.cvdEnabled && this.cvdSeries) {
+            this.cvdSeries.setData(this.cvdData);
+        }
+    }
+
+    getIntervalSeconds() {
+        const intervals = {
+            '1m': 60,
+            '5m': 300,
+            '15m': 900,
+            '1h': 3600,
+            '4h': 14400,
+            '1d': 86400,
+        };
+        return intervals[this.timeframe] || 900;
+    }
+
+    toggleCVD() {
+        this.cvdEnabled = !this.cvdEnabled;
+        const button = document.getElementById('toggleCVD');
+
+        if (this.cvdEnabled) {
+            button.classList.add('active');
+            this.addCVDIndicator();
+        } else {
+            button.classList.remove('active');
+            this.removeCVDIndicator();
+        }
+    }
+
+    addCVDIndicator() {
+        if (!this.cvdSeries) {
+            this.cvdSeries = this.chart.addLineSeries({
+                color: '#2962ff',
+                lineWidth: 2,
+                priceScaleId: 'cvd',
+                title: 'CVD',
+            });
+
+            this.chart.priceScale('cvd').applyOptions({
+                scaleMargins: {
+                    top: 0.7,
+                    bottom: 0,
+                },
+            });
+        }
+
+        this.cvdSeries.setData(this.cvdData);
+        this.addIndicatorTag('CVD', '#2962ff');
+        this.setStatus('CVD indicator added', 'success');
+    }
+
+    removeCVDIndicator() {
+        if (this.cvdSeries) {
+            this.chart.removeSeries(this.cvdSeries);
+            this.cvdSeries = null;
+        }
+        this.removeIndicatorTag('CVD');
+        this.setStatus('CVD indicator removed', 'info');
+    }
+
+    addIndicatorTag(name, color) {
+        const indicatorList = document.getElementById('indicatorList');
+
+        // Check if already exists
+        if (document.getElementById(`indicator-${name}`)) {
+            return;
+        }
+
+        const tag = document.createElement('div');
+        tag.className = 'indicator-tag';
+        tag.id = `indicator-${name}`;
+        tag.innerHTML = `
+            <span style="width: 12px; height: 2px; background: ${color};"></span>
+            <span>${name}</span>
+            <span class="remove" onclick="tradingChart.removeIndicatorByName('${name}')">×</span>
+        `;
+        indicatorList.appendChild(tag);
+    }
+
+    removeIndicatorTag(name) {
+        const tag = document.getElementById(`indicator-${name}`);
+        if (tag) {
+            tag.remove();
+        }
+    }
+
+    removeIndicatorByName(name) {
+        if (name === 'CVD') {
+            this.cvdEnabled = false;
+            document.getElementById('toggleCVD').classList.remove('active');
+            this.removeCVDIndicator();
+        }
+    }
+
+    updatePriceDisplay() {
+        if (this.candleData.length === 0) return;
+
+        const latestCandle = this.candleData[this.candleData.length - 1];
+        const previousCandle = this.candleData[this.candleData.length - 2];
+
+        const currentPrice = latestCandle.close;
+        const change = currentPrice - previousCandle.close;
+        const changePercent = (change / previousCandle.close) * 100;
+
+        document.getElementById('currentPrice').textContent =
+            currentPrice.toLocaleString('fa-IR') + ' ریال';
+
+        const priceChangeEl = document.getElementById('priceChange');
+        priceChangeEl.textContent =
+            `${change >= 0 ? '+' : ''}${change.toLocaleString('fa-IR')} (${changePercent.toFixed(2)}%)`;
+        priceChangeEl.className = `price-change ${change >= 0 ? 'positive' : 'negative'}`;
+    }
+
+    runPineScript() {
+        const code = document.getElementById('pineEditor').value.trim();
+
+        if (!code) {
+            this.setStatus('Please enter Pine Script code', 'error');
+            return;
+        }
+
+        this.setStatus('Executing Pine Script...', 'info');
+
+        try {
+            // Parse and execute Pine Script
+            const result = this.executePineScript(code);
+
+            if (result.success) {
+                this.setStatus('Script executed successfully!', 'success');
+
+                if (result.series) {
+                    this.addCustomIndicator(result);
+                }
+            } else {
+                this.setStatus('Error: ' + result.error, 'error');
+            }
+        } catch (error) {
+            this.setStatus('Error: ' + error.message, 'error');
+        }
+    }
+
+    executePineScript(code) {
+        // Simple Pine Script parser for demonstration
+        // This is a simplified version - full Pine Script is much more complex
+
+        try {
+            // Extract indicator name
+            const indicatorMatch = code.match(/indicator\(['"](.+?)['"]/);
+            const indicatorName = indicatorMatch ? indicatorMatch[1] : 'Custom Indicator';
+
+            // Check for SMA
+            if (code.includes('ta.sma')) {
+                const lengthMatch = code.match(/length\s*=\s*(?:input\()?(\d+)/);
+                const length = lengthMatch ? parseInt(lengthMatch[1]) : 20;
+
+                const smaData = this.calculateSMA(this.candleData, length);
+
+                return {
+                    success: true,
+                    name: indicatorName,
+                    series: smaData,
+                    type: 'line',
+                    color: '#2962ff',
+                };
+            }
+
+            // Check for EMA
+            if (code.includes('ta.ema')) {
+                const lengthMatch = code.match(/length\s*=\s*(?:input\()?(\d+)/);
+                const length = lengthMatch ? parseInt(lengthMatch[1]) : 20;
+
+                const emaData = this.calculateEMA(this.candleData, length);
+
+                return {
+                    success: true,
+                    name: indicatorName,
+                    series: emaData,
+                    type: 'line',
+                    color: '#f23645',
+                };
+            }
+
+            return {
+                success: false,
+                error: 'Unsupported Pine Script function. Try ta.sma() or ta.ema()',
+            };
+
+        } catch (error) {
+            return {
+                success: false,
+                error: error.message,
+            };
+        }
+    }
+
+    calculateSMA(data, period) {
+        const result = [];
+
+        for (let i = period - 1; i < data.length; i++) {
+            let sum = 0;
+            for (let j = 0; j < period; j++) {
+                sum += data[i - j].close;
+            }
+            result.push({
+                time: data[i].time,
+                value: sum / period,
+            });
+        }
+
+        return result;
+    }
+
+    calculateEMA(data, period) {
+        const result = [];
+        const multiplier = 2 / (period + 1);
+
+        // First EMA is SMA
+        let ema = 0;
+        for (let i = 0; i < period; i++) {
+            ema += data[i].close;
+        }
+        ema = ema / period;
+
+        result.push({
+            time: data[period - 1].time,
+            value: ema,
+        });
+
+        // Calculate EMA for remaining data
+        for (let i = period; i < data.length; i++) {
+            ema = (data[i].close - ema) * multiplier + ema;
+            result.push({
+                time: data[i].time,
+                value: ema,
+            });
+        }
+
+        return result;
+    }
+
+    addCustomIndicator(result) {
+        const series = this.chart.addLineSeries({
+            color: result.color,
+            lineWidth: 2,
+            title: result.name,
+        });
+
+        series.setData(result.series);
+        this.indicators.push({ name: result.name, series });
+        this.addIndicatorTag(result.name, result.color);
+    }
+
+    loadCVDExample() {
+        const cvdExample = `// Cumulative Volume Delta (CVD) Indicator
+//@version=5
+indicator('CVD - Cumulative Volume Delta', overlay=false)
+
+// CVD calculates the cumulative difference between buying and selling volume
+// Positive CVD indicates more buying pressure
+// Negative CVD indicates more selling pressure
+
+// This is a simplified example
+// In the actual implementation, CVD is calculated from order book data
+
+plot(cvd, color=color.blue, linewidth=2, title='CVD')
+hline(0, color=color.gray, linestyle=hline.style_dashed)`;
+
+        document.getElementById('pineEditor').value = cvdExample;
+        this.setStatus('CVD example loaded. Click "Toggle CVD" to see the indicator on chart.', 'success');
+    }
+
+    setStatus(message, type = 'info') {
+        const statusEl = document.getElementById('editorStatus');
+        statusEl.textContent = message;
+        statusEl.className = `status-message ${type}`;
+    }
+}
+
+// Initialize the application
+let tradingChart;
+window.addEventListener('DOMContentLoaded', () => {
+    tradingChart = new TradingChart();
+});

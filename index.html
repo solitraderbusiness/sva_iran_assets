@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SVA Iran Assets - Trading Chart</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-left">
+                <h1 class="logo">SVA Iran Assets</h1>
+                <div class="asset-selector">
+                    <select id="assetSelect">
+                        <option value="USDTIRT">USDT/IRT</option>
+                        <option value="GOLD" disabled>طلا (Coming Soon)</option>
+                        <option value="COIN" disabled>سکه (Coming Soon)</option>
+                    </select>
+                </div>
+            </div>
+            <div class="header-right">
+                <div class="price-info">
+                    <span class="current-price" id="currentPrice">Loading...</span>
+                    <span class="price-change" id="priceChange">--</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Chart Section -->
+        <div class="chart-section">
+            <div class="chart-controls">
+                <div class="control-group">
+                    <button class="btn" id="toggleCVD">Toggle CVD</button>
+                    <button class="btn" id="refreshData">Refresh Data</button>
+                    <select id="timeframeSelect">
+                        <option value="1m">1m</option>
+                        <option value="5m">5m</option>
+                        <option value="15m" selected>15m</option>
+                        <option value="1h">1h</option>
+                        <option value="4h">4h</option>
+                        <option value="1d">1D</option>
+                    </select>
+                </div>
+                <div class="indicator-list" id="indicatorList">
+                    <span class="indicator-label">Indicators:</span>
+                </div>
+            </div>
+            <div id="chartContainer" class="chart-container"></div>
+        </div>
+
+        <!-- Pine Script Editor Section -->
+        <div class="editor-section">
+            <div class="editor-header">
+                <h3>Pine Script Editor</h3>
+                <div class="editor-controls">
+                    <button class="btn btn-primary" id="runScript">Run Script</button>
+                    <button class="btn" id="loadCVDExample">Load CVD Example</button>
+                    <button class="btn" id="clearEditor">Clear</button>
+                </div>
+            </div>
+            <div class="editor-container">
+                <textarea id="pineEditor" placeholder="// Write your Pine Script indicator here
+// Example: Simple Moving Average
+//@version=5
+indicator('My Indicator', overlay=true)
+length = input(20, 'Length')
+sma = ta.sma(close, length)
+plot(sma, color=color.blue, linewidth=2)"></textarea>
+            </div>
+            <div class="editor-footer">
+                <div id="editorStatus" class="status-message"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

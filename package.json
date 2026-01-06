@@ -1,0 +1,13 @@
+{
+  "name": "sva-iran-assets",
+  "version": "1.0.0",
+  "description": "Trading chart for Iranian assets with CVD indicator and Pine Script support",
+  "main": "index.html",
+  "scripts": {
+    "start": "python3 -m http.server 8000",
+    "dev": "python3 -m http.server 8000"
+  },
+  "keywords": ["trading", "chart", "iran", "cvd", "pinescript"],
+  "author": "",
+  "license": "MIT"
+}

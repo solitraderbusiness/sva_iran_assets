@@ -163,6 +163,62 @@ def get_stats():
             'error': str(e)
         }), 500
 
+@app.route('/api/debug/recent', methods=['GET'])
+def get_debug_recent():
+    """Get detailed information about recent data for debugging"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        # Get last 5 records with full details
+        cursor.execute('''
+            SELECT * FROM cvd_data
+            ORDER BY timestamp DESC
+            LIMIT 5
+        ''')
+        rows = cursor.fetchall()
+
+        # Convert to detailed format
+        data = []
+        for row in rows:
+            data.append({
+                'timestamp': row['timestamp'],
+                'buy_volume': row['buy_volume'],
+                'sell_volume': row['sell_volume'],
+                'volume_delta': row['volume_delta'],
+                'cvd': row['cvd'],
+                'trade_count': row['trade_count'],
+                'avg_price': row['avg_price']
+            })
+
+        conn.close()
+
+        # Calculate some validation metrics
+        if len(data) >= 2:
+            cvd_change = data[0]['cvd'] - data[1]['cvd']
+            expected_change = data[0]['volume_delta']
+
+            validation = {
+                'cvd_accumulation_correct': abs(cvd_change - expected_change) < 0.01,
+                'latest_cvd_change': cvd_change,
+                'latest_volume_delta': expected_change
+            }
+        else:
+            validation = {}
+
+        return jsonify({
+            'success': True,
+            'data': data,
+            'validation': validation
+        })
+
+    except Exception as e:
+        logger.error(f"Error in debug endpoint: {e}", exc_info=True)
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
 if __name__ == '__main__':
     # Run on port 5000, accessible from anywhere
     app.run(host='0.0.0.0', port=5000, debug=False)

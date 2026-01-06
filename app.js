@@ -100,9 +100,27 @@ class TradingChart {
         this.setStatus('Loading data...', 'info');
 
         try {
-            // Try to fetch real data from Nobitex API
-            console.log('Attempting to fetch from Nobitex API...');
-            const response = await fetch('https://apiv2.nobitex.ir/v3/orderbook/USDTIRT');
+            // Calculate time range (last 200 candles)
+            const to = Math.floor(Date.now() / 1000);
+            const intervalSeconds = this.getIntervalSeconds();
+            const from = to - (200 * intervalSeconds);
+
+            // Map timeframe to Nobitex resolution
+            const resolutionMap = {
+                '1m': '1',
+                '5m': '5',
+                '15m': '15',
+                '1h': '60',
+                '4h': '240',
+                '1d': 'D'
+            };
+            const resolution = resolutionMap[this.timeframe] || '15';
+
+            // Fetch real OHLCV data from Nobitex
+            const url = `https://apiv2.nobitex.ir/market/udf/history?symbol=USDTIRT&resolution=${resolution}&from=${from}&to=${to}`;
+            console.log('Fetching from Nobitex API:', url);
+
+            const response = await fetch(url);
 
             if (!response.ok) {
                 throw new Error('API not available');
@@ -110,10 +128,15 @@ class TradingChart {
 
             const data = await response.json();
             console.log('API data received:', data);
-            this.processRealData(data);
+
+            if (data.s === 'ok' && data.t && data.t.length > 0) {
+                this.processRealData(data);
+            } else {
+                throw new Error('No data returned from API');
+            }
 
         } catch (error) {
-            console.log('Using mock data (API not available):', error.message);
+            console.log('Using mock data (API error):', error.message);
             this.generateMockData();
         }
 
@@ -123,11 +146,45 @@ class TradingChart {
     }
 
     processRealData(data) {
-        // Process real orderbook data from Nobitex
-        // Note: Orderbook data needs to be converted to candlestick format
-        // For MVP, we'll use the current price to generate candles
-        const currentPrice = parseFloat(data.bids[0]?.price || 1480000);
-        this.generateMockData(currentPrice);
+        // Process real OHLCV data from Nobitex API
+        // Data format: { s: 'ok', t: [times], o: [opens], h: [highs], l: [lows], c: [closes], v: [volumes] }
+
+        this.candleData = [];
+        this.cvdData = [];
+        let cvd = 0;
+
+        for (let i = 0; i < data.t.length; i++) {
+            const open = parseFloat(data.o[i]);
+            const high = parseFloat(data.h[i]);
+            const low = parseFloat(data.l[i]);
+            const close = parseFloat(data.c[i]);
+            const volume = parseFloat(data.v[i] || 0);
+
+            // Calculate volume delta (simplified: positive if close > open, negative otherwise)
+            const volumeDelta = close > open ? volume : -volume;
+            cvd += volumeDelta;
+
+            this.candleData.push({
+                time: data.t[i],
+                open: open,
+                high: high,
+                low: low,
+                close: close,
+                volume: volume
+            });
+
+            this.cvdData.push({
+                time: data.t[i],
+                value: cvd
+            });
+        }
+
+        console.log('Processed', this.candleData.length, 'real candles from Nobitex');
+        this.candlestickSeries.setData(this.candleData);
+
+        if (this.cvdEnabled && this.cvdSeries) {
+            this.cvdSeries.setData(this.cvdData);
+        }
     }
 
     generateMockData(basePrice = 1480000) {

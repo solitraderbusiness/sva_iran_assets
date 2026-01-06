@@ -1,4 +1,11 @@
 // SVA Iran Assets Trading Chart Application
+
+// Configuration
+const CONFIG = {
+    CVD_API_URL: 'http://31.97.32.203:5000',  // Your CVD data server
+    USE_REAL_CVD: true,  // Set to false to use estimated CVD
+};
+
 class TradingChart {
     constructor() {
         this.chart = null;
@@ -10,6 +17,7 @@ class TradingChart {
         this.timeframe = '15m';
         this.candleData = [];
         this.cvdData = [];
+        this.useRealCVD = CONFIG.USE_REAL_CVD;
 
         this.init();
     }
@@ -141,8 +149,65 @@ class TradingChart {
         }
 
         console.log('Generated', this.candleData.length, 'candles');
+
+        // Load real CVD data from server if enabled
+        if (this.useRealCVD) {
+            await this.loadRealCVD();
+        }
+
         this.updatePriceDisplay();
         this.setStatus('Data loaded successfully', 'success');
+    }
+
+    async loadRealCVD() {
+        try {
+            console.log('Fetching real CVD data from server...');
+
+            // Calculate time range for CVD data (match candle data range)
+            if (this.candleData.length === 0) {
+                console.log('No candle data available, skipping CVD fetch');
+                return;
+            }
+
+            const fromTime = this.candleData[0].time;
+            const toTime = this.candleData[this.candleData.length - 1].time;
+
+            const url = `${CONFIG.CVD_API_URL}/api/cvd?from=${fromTime}&to=${toTime}&limit=1000`;
+            console.log('Fetching CVD from:', url);
+
+            const response = await fetch(url);
+
+            if (!response.ok) {
+                throw new Error(`Server returned ${response.status}`);
+            }
+
+            const result = await response.json();
+
+            if (result.success && result.data && result.data.length > 0) {
+                // Map server CVD data to chart format
+                this.cvdData = result.data.map(item => ({
+                    time: item.time,
+                    value: item.cvd
+                }));
+
+                console.log(`Loaded ${this.cvdData.length} real CVD data points from server`);
+
+                // Update CVD series if it's currently displayed
+                if (this.cvdEnabled && this.cvdSeries) {
+                    this.cvdSeries.setData(this.cvdData);
+                }
+
+                this.setStatus('Real CVD data loaded from server', 'success');
+            } else {
+                throw new Error('No CVD data available');
+            }
+
+        } catch (error) {
+            console.log('Could not load real CVD from server:', error.message);
+            console.log('Using estimated CVD instead');
+            this.setStatus('Using estimated CVD (server unavailable)', 'info');
+            // cvdData already contains estimated CVD from processRealData
+        }
     }
 
     processRealData(data) {
@@ -306,8 +371,15 @@ class TradingChart {
         }
 
         this.cvdSeries.setData(this.cvdData);
-        this.addIndicatorTag('CVD', '#2962ff');
-        this.setStatus('CVD indicator added', 'success');
+
+        // Indicate if using real or estimated CVD
+        const cvdType = this.useRealCVD ? 'CVD (Real)' : 'CVD (Estimated)';
+        this.addIndicatorTag(cvdType, '#2962ff');
+
+        const statusMsg = this.useRealCVD ?
+            'Real CVD indicator added (from server)' :
+            'Estimated CVD indicator added';
+        this.setStatus(statusMsg, 'success');
     }
 
     removeCVDIndicator() {
@@ -315,7 +387,9 @@ class TradingChart {
             this.chart.removeSeries(this.cvdSeries);
             this.cvdSeries = null;
         }
-        this.removeIndicatorTag('CVD');
+        // Remove tag with correct name
+        const cvdType = this.useRealCVD ? 'CVD (Real)' : 'CVD (Estimated)';
+        this.removeIndicatorTag(cvdType);
         this.setStatus('CVD indicator removed', 'info');
     }
 
@@ -346,7 +420,7 @@ class TradingChart {
     }
 
     removeIndicatorByName(name) {
-        if (name === 'CVD') {
+        if (name === 'CVD' || name === 'CVD (Real)' || name === 'CVD (Estimated)') {
             this.cvdEnabled = false;
             document.getElementById('toggleCVD').classList.remove('active');
             this.removeCVDIndicator();

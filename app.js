@@ -22,6 +22,8 @@ class TradingChart {
 
     createChart() {
         const chartContainer = document.getElementById('chartContainer');
+        console.log('Creating chart...');
+        console.log('Chart container dimensions:', chartContainer.clientWidth, 'x', chartContainer.clientHeight);
 
         this.chart = LightweightCharts.createChart(chartContainer, {
             width: chartContainer.clientWidth,
@@ -94,10 +96,12 @@ class TradingChart {
     }
 
     async loadData() {
+        console.log('Loading data...');
         this.setStatus('Loading data...', 'info');
 
         try {
             // Try to fetch real data from Nobitex API
+            console.log('Attempting to fetch from Nobitex API...');
             const response = await fetch('https://apiv2.nobitex.ir/v3/orderbook/USDTIRT');
 
             if (!response.ok) {
@@ -105,6 +109,7 @@ class TradingChart {
             }
 
             const data = await response.json();
+            console.log('API data received:', data);
             this.processRealData(data);
 
         } catch (error) {
@@ -112,6 +117,7 @@ class TradingChart {
             this.generateMockData();
         }
 
+        console.log('Generated', this.candleData.length, 'candles');
         this.updatePriceDisplay();
         this.setStatus('Data loaded successfully', 'success');
     }
@@ -459,5 +465,24 @@ hline(0, color=color.gray, linestyle=hline.style_dashed)`;
 // Initialize the application
 let tradingChart;
 window.addEventListener('DOMContentLoaded', () => {
-    tradingChart = new TradingChart();
+    console.log('DOM loaded, initializing application...');
+
+    // Check if LightweightCharts is available
+    if (typeof LightweightCharts === 'undefined') {
+        console.error('LightweightCharts library not loaded! Check your internet connection.');
+        document.getElementById('currentPrice').textContent = 'Error: Chart library failed to load';
+        document.getElementById('currentPrice').style.color = '#f23645';
+        return;
+    }
+
+    console.log('LightweightCharts loaded successfully');
+
+    try {
+        tradingChart = new TradingChart();
+        console.log('TradingChart initialized successfully');
+    } catch (error) {
+        console.error('Error initializing TradingChart:', error);
+        document.getElementById('currentPrice').textContent = 'Error: ' + error.message;
+        document.getElementById('currentPrice').style.color = '#f23645';
+    }
 });

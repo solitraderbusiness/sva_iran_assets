@@ -172,7 +172,7 @@ class TradingChart {
             const fromTime = this.candleData[0].time;
             const toTime = this.candleData[this.candleData.length - 1].time;
 
-            const url = `${CONFIG.CVD_API_URL}/api/cvd?from=${fromTime}&to=${toTime}&limit=1000`;
+            const url = `${CONFIG.CVD_API_URL}/api/cvd?from=${fromTime}&to=${toTime}&limit=10000`;
             console.log('Fetching CVD from:', url);
 
             const response = await fetch(url);
@@ -184,29 +184,16 @@ class TradingChart {
             const result = await response.json();
 
             if (result.success && result.data && result.data.length > 0) {
-                // Map server CVD data to chart format
-                this.cvdData = result.data.map(item => ({
-                    time: item.time,
-                    value: item.cvd
-                }));
+                // Aggregate CVD data to match price candle timeframe
+                const aggregatedCVD = this.aggregateCVDToTimeframe(result.data);
 
-                console.log(`Loaded ${this.cvdData.length} real CVD data points from server`);
+                this.cvdData = aggregatedCVD;
+
+                console.log(`Loaded and aggregated ${this.cvdData.length} CVD candles (from ${result.data.length} data points)`);
 
                 // Update CVD series if it's currently displayed
                 if (this.cvdEnabled && this.cvdSeries) {
-                    // Convert to candlestick format
-                    const candlestickData = this.cvdData.map((item, index) => {
-                        const prevValue = index > 0 ? this.cvdData[index - 1].value : 0;
-                        const currentValue = item.value;
-                        return {
-                            time: item.time,
-                            open: prevValue,
-                            high: Math.max(prevValue, currentValue),
-                            low: Math.min(prevValue, currentValue),
-                            close: currentValue
-                        };
-                    });
-                    this.cvdSeries.setData(candlestickData);
+                    this.cvdSeries.setData(this.cvdData);
                 }
 
                 this.setStatus('Real CVD data loaded from server', 'success');
@@ -220,6 +207,55 @@ class TradingChart {
             this.setStatus('Using estimated CVD (server unavailable)', 'info');
             // cvdData already contains estimated CVD from processRealData
         }
+    }
+
+    aggregateCVDToTimeframe(rawCVDData) {
+        // Aggregate 1-minute CVD data to match the price candle timeframe
+        const intervalSeconds = this.getIntervalSeconds();
+        const aggregated = [];
+
+        // Group CVD data by price candle time buckets
+        for (let i = 0; i < this.candleData.length; i++) {
+            const candleTime = this.candleData[i].time;
+            const nextCandleTime = candleTime + intervalSeconds;
+
+            // Find all CVD points within this candle's time range
+            const cvdPointsInRange = rawCVDData.filter(point =>
+                point.time >= candleTime && point.time < nextCandleTime
+            );
+
+            if (cvdPointsInRange.length > 0) {
+                // Get CVD values for this period
+                const cvdValues = cvdPointsInRange.map(p => p.cvd);
+
+                // Create OHLC for this CVD candle
+                const open = cvdPointsInRange[0].cvd;
+                const close = cvdPointsInRange[cvdPointsInRange.length - 1].cvd;
+                const high = Math.max(...cvdValues);
+                const low = Math.min(...cvdValues);
+
+                aggregated.push({
+                    time: candleTime,
+                    open: open,
+                    high: high,
+                    low: low,
+                    close: close
+                });
+            } else {
+                // No CVD data for this period, use previous close or 0
+                const prevCVD = i > 0 && aggregated[i - 1] ? aggregated[i - 1].close : 0;
+
+                aggregated.push({
+                    time: candleTime,
+                    open: prevCVD,
+                    high: prevCVD,
+                    low: prevCVD,
+                    close: prevCVD
+                });
+            }
+        }
+
+        return aggregated;
     }
 
     processRealData(data) {
@@ -411,23 +447,27 @@ class TradingChart {
             });
         }
 
-        // Convert CVD data to candlestick format with OHLC
-        const candlestickData = this.cvdData.map((item, index) => {
-            // For CVD candlesticks, we need to show the delta behavior
-            // Open = previous CVD, Close = current CVD
-            // High/Low show the extremes during this period
+        // Check if CVD data is already in OHLC format or needs conversion
+        let candlestickData;
 
-            const prevValue = index > 0 ? this.cvdData[index - 1].value : 0;
-            const currentValue = item.value;
+        if (this.cvdData.length > 0 && this.cvdData[0].open !== undefined) {
+            // Already in OHLC format (from real CVD server)
+            candlestickData = this.cvdData;
+        } else {
+            // Convert from simple value format (estimated CVD)
+            candlestickData = this.cvdData.map((item, index) => {
+                const prevValue = index > 0 ? this.cvdData[index - 1].value : 0;
+                const currentValue = item.value;
 
-            return {
-                time: item.time,
-                open: prevValue,
-                high: Math.max(prevValue, currentValue),
-                low: Math.min(prevValue, currentValue),
-                close: currentValue
-            };
-        });
+                return {
+                    time: item.time,
+                    open: prevValue,
+                    high: Math.max(prevValue, currentValue),
+                    low: Math.min(prevValue, currentValue),
+                    close: currentValue
+                };
+            });
+        }
 
         this.cvdSeries.setData(candlestickData);
 

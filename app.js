@@ -194,17 +194,19 @@ class TradingChart {
 
                 // Update CVD series if it's currently displayed
                 if (this.cvdEnabled && this.cvdSeries) {
-                    // Convert to histogram format
-                    const histogramData = this.cvdData.map((item, index) => {
+                    // Convert to candlestick format
+                    const candlestickData = this.cvdData.map((item, index) => {
                         const prevValue = index > 0 ? this.cvdData[index - 1].value : 0;
-                        const delta = item.value - prevValue;
+                        const currentValue = item.value;
                         return {
                             time: item.time,
-                            value: item.value,
-                            color: delta >= 0 ? '#26a69a' : '#ef5350'
+                            open: prevValue,
+                            high: Math.max(prevValue, currentValue),
+                            low: Math.min(prevValue, currentValue),
+                            close: currentValue
                         };
                     });
-                    this.cvdSeries.setData(histogramData);
+                    this.cvdSeries.setData(candlestickData);
                 }
 
                 this.setStatus('Real CVD data loaded from server', 'success');
@@ -276,17 +278,19 @@ class TradingChart {
         this.candlestickSeries.setData(this.candleData);
 
         if (this.cvdEnabled && this.cvdSeries) {
-            // Convert to histogram format
-            const histogramData = this.cvdData.map((item, index) => {
+            // Convert to candlestick format
+            const candlestickData = this.cvdData.map((item, index) => {
                 const prevValue = index > 0 ? this.cvdData[index - 1].value : 0;
-                const delta = item.value - prevValue;
+                const currentValue = item.value;
                 return {
                     time: item.time,
-                    value: item.value,
-                    color: delta >= 0 ? '#26a69a' : '#ef5350'
+                    open: prevValue,
+                    high: Math.max(prevValue, currentValue),
+                    low: Math.min(prevValue, currentValue),
+                    close: currentValue
                 };
             });
-            this.cvdSeries.setData(histogramData);
+            this.cvdSeries.setData(candlestickData);
         }
     }
 
@@ -344,17 +348,19 @@ class TradingChart {
         this.candlestickSeries.setData(this.candleData);
 
         if (this.cvdEnabled && this.cvdSeries) {
-            // Convert to histogram format
-            const histogramData = this.cvdData.map((item, index) => {
+            // Convert to candlestick format
+            const candlestickData = this.cvdData.map((item, index) => {
                 const prevValue = index > 0 ? this.cvdData[index - 1].value : 0;
-                const delta = item.value - prevValue;
+                const currentValue = item.value;
                 return {
                     time: item.time,
-                    value: item.value,
-                    color: delta >= 0 ? '#26a69a' : '#ef5350'
+                    open: prevValue,
+                    high: Math.max(prevValue, currentValue),
+                    low: Math.min(prevValue, currentValue),
+                    close: currentValue
                 };
             });
-            this.cvdSeries.setData(histogramData);
+            this.cvdSeries.setData(candlestickData);
         }
     }
 
@@ -385,11 +391,14 @@ class TradingChart {
 
     addCVDIndicator() {
         if (!this.cvdSeries) {
-            this.cvdSeries = this.chart.addHistogramSeries({
-                color: '#2962ff',
-                priceFormat: {
-                    type: 'volume',
-                },
+            // Use candlestick series for CVD to show OHLC
+            this.cvdSeries = this.chart.addCandlestickSeries({
+                upColor: '#26a69a',
+                downColor: '#ef5350',
+                borderUpColor: '#26a69a',
+                borderDownColor: '#ef5350',
+                wickUpColor: '#26a69a',
+                wickDownColor: '#ef5350',
                 priceScaleId: 'cvd',
                 title: 'CVD',
             });
@@ -402,20 +411,25 @@ class TradingChart {
             });
         }
 
-        // Convert CVD data to histogram format (needs 'value' and optional 'color')
-        const histogramData = this.cvdData.map((item, index) => {
-            // Color bars based on delta (positive = green, negative = red)
+        // Convert CVD data to candlestick format with OHLC
+        const candlestickData = this.cvdData.map((item, index) => {
+            // For CVD candlesticks, we need to show the delta behavior
+            // Open = previous CVD, Close = current CVD
+            // High/Low show the extremes during this period
+
             const prevValue = index > 0 ? this.cvdData[index - 1].value : 0;
-            const delta = item.value - prevValue;
+            const currentValue = item.value;
 
             return {
                 time: item.time,
-                value: item.value,
-                color: delta >= 0 ? '#26a69a' : '#ef5350'
+                open: prevValue,
+                high: Math.max(prevValue, currentValue),
+                low: Math.min(prevValue, currentValue),
+                close: currentValue
             };
         });
 
-        this.cvdSeries.setData(histogramData);
+        this.cvdSeries.setData(candlestickData);
 
         // Indicate if using real or estimated CVD
         const cvdType = this.useRealCVD ? 'CVD (Real)' : 'CVD (Estimated)';

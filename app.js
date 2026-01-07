@@ -196,7 +196,8 @@ class TradingChart {
         const resolution = resolutionMap[this.timeframe] || '15';
 
         // Fetch BTC/USDT data from Finnhub
-        const url = `https://finnhub.io/api/v1/crypto/candle?symbol=OANDA:BTC_USD&resolution=${resolution}&from=${from}&to=${to}&token=${CONFIG.FINNHUB_API_KEY}`;
+        // Use BINANCE:BTCUSDT for crypto trades
+        const url = `https://finnhub.io/api/v1/crypto/candle?symbol=BINANCE:BTCUSDT&resolution=${resolution}&from=${from}&to=${to}&token=${CONFIG.FINNHUB_API_KEY}`;
         console.log('Fetching from Finnhub API:', url);
 
         const response = await fetch(url);

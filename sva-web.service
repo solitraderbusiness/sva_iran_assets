@@ -1,0 +1,14 @@
+[Unit]
+Description=SVA Iran Assets Web Server
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/home/user/sva_iran_assets
+ExecStart=/usr/bin/python3 -m http.server 80
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

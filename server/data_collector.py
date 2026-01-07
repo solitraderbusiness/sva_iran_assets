@@ -8,24 +8,31 @@ import sqlite3
 import time
 import requests
 import json
+import os
 from datetime import datetime
 import logging
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 # Setup logging
+LOG_PATH = os.getenv('LOG_PATH_USDT', '/var/log/sva_cvd_collector.log')
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler('/var/log/sva_cvd_collector.log'),
+        logging.FileHandler(LOG_PATH),
         logging.StreamHandler()
     ]
 )
 
 logger = logging.getLogger(__name__)
 
-# Database setup
-DB_PATH = '/var/lib/sva_iran_assets/cvd_data.db'
+# Configuration from environment variables
+DB_PATH = os.getenv('DB_PATH_USDT', '/var/lib/sva_iran_assets/cvd_data.db')
 API_URL = 'https://apiv2.nobitex.ir/v2/trades/USDTIRT'
+UPDATE_INTERVAL = int(os.getenv('UPDATE_INTERVAL', '10'))
 
 def init_database():
     """Initialize SQLite database with required tables"""
@@ -215,16 +222,16 @@ def main():
             if int(time.time()) % 3600 == 0:
                 cleanup_old_data()
 
-            # Wait 10 seconds before next collection (for real-time updates)
+            # Wait before next collection (for real-time updates)
             # Note: Nobitex limit is 60/minute, so 10 seconds is safe
-            time.sleep(10)
+            time.sleep(UPDATE_INTERVAL)
 
         except KeyboardInterrupt:
             logger.info("Shutting down gracefully...")
             break
         except Exception as e:
             logger.error(f"Unexpected error: {e}", exc_info=True)
-            time.sleep(10)  # Wait before retrying
+            time.sleep(UPDATE_INTERVAL)  # Wait before retrying
 
 if __name__ == '__main__':
     main()

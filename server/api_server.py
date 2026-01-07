@@ -6,9 +6,14 @@ Serves historical CVD data to the frontend
 
 import sqlite3
 import json
+import os
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 import logging
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -17,8 +22,9 @@ logger = logging.getLogger(__name__)
 app = Flask(__name__)
 CORS(app)  # Enable CORS for frontend access
 
-DB_PATH_USDT = '/var/lib/sva_iran_assets/cvd_data.db'
-DB_PATH_BTC = '/var/lib/sva_iran_assets/cvd_btc_data.db'
+# Configuration from environment variables
+DB_PATH_USDT = os.getenv('DB_PATH_USDT', '/var/lib/sva_iran_assets/cvd_data.db')
+DB_PATH_BTC = os.getenv('DB_PATH_BTC', '/var/lib/sva_iran_assets/cvd_btc_data.db')
 
 def get_db_connection(asset='USDTIRT'):
     """Get database connection based on asset"""
@@ -239,5 +245,9 @@ def get_debug_recent():
         }), 500
 
 if __name__ == '__main__':
-    # Run on port 5000, accessible from anywhere
-    app.run(host='0.0.0.0', port=5000, debug=False)
+    # Configuration from environment variables
+    host = os.getenv('API_HOST', '0.0.0.0')
+    port = int(os.getenv('API_PORT', '5000'))
+
+    logger.info(f"Starting CVD API Server on {host}:{port}")
+    app.run(host=host, port=port, debug=False)

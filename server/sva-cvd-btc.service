@@ -5,14 +5,14 @@ After=network.target
 [Service]
 Type=simple
 User=root
-WorkingDirectory=/opt/sva_iran_assets/server
+WorkingDirectory=/opt/sva_iran_assets
 ExecStart=/usr/bin/python3 /opt/sva_iran_assets/server/data_collector_btc.py
 Restart=always
 RestartSec=10
 StandardOutput=journal
 StandardError=journal
 
-# WebSocket requires additional dependencies
+# Environment configuration
 Environment="PYTHONUNBUFFERED=1"
 
 [Install]

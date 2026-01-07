@@ -1,13 +1,5 @@
 // SVA Iran Assets Trading Chart Application
-
-// Configuration
-const CONFIG = {
-    CVD_API_URL: 'http://31.97.32.203:5000',  // Your CVD data server
-    USE_REAL_CVD: true,  // Set to false to use estimated CVD
-    AUTO_REFRESH: true,  // Auto-refresh chart data
-    REFRESH_INTERVAL: 10000,  // Refresh every 10 seconds (10000ms)
-    FINNHUB_API_KEY: 'YOUR_FINNHUB_API_KEY',  // Replace with your Finnhub API key
-};
+// Configuration is loaded from config.js
 
 class TradingChart {
     constructor() {

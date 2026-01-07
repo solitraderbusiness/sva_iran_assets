@@ -13,6 +13,9 @@ build/
 .env.local
 .env.production
 
+# Configuration files with secrets
+config.js
+
 # IDE
 .vscode/
 .idea/

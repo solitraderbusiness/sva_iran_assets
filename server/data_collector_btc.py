@@ -10,26 +10,39 @@ import sqlite3
 import time
 import logging
 import websocket
+import os
 from datetime import datetime
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 # Setup logging
+LOG_PATH = os.getenv('LOG_PATH_BTC', '/var/log/sva_cvd_btc.log')
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler('/var/log/sva_cvd_btc.log'),
+        logging.FileHandler(LOG_PATH),
         logging.StreamHandler()
     ]
 )
 
 logger = logging.getLogger(__name__)
 
-# Configuration
-DB_PATH = '/var/lib/sva_iran_assets/cvd_btc_data.db'
-FINNHUB_API_KEY = 'YOUR_FINNHUB_API_KEY'  # Replace with your API key
-WEBSOCKET_URL = f'wss://ws.finnhub.io?token={FINNHUB_API_KEY}'
-UPDATE_INTERVAL = 10  # Aggregate and store every 10 seconds
+# Configuration from environment variables
+DB_PATH = os.getenv('DB_PATH_BTC', '/var/lib/sva_iran_assets/cvd_btc_data.db')
+FINNHUB_API_KEY = os.getenv('FINNHUB_API_KEY')
+UPDATE_INTERVAL = int(os.getenv('UPDATE_INTERVAL', '10'))
 SYMBOL = 'BINANCE:BTCUSDT'
+
+# Validate API key
+if not FINNHUB_API_KEY or FINNHUB_API_KEY == 'your_finnhub_api_key_here':
+    logger.error("FINNHUB_API_KEY not set in .env file!")
+    logger.error("Please copy .env.example to .env and set your Finnhub API key")
+    exit(1)
+
+WEBSOCKET_URL = f'wss://ws.finnhub.io?token={FINNHUB_API_KEY}'
 
 class BTCCVDCollector:
     def __init__(self):

@@ -16,37 +16,52 @@ if [ "$EUID" -ne 0 ]; then
   exit 1
 fi
 
-# Check if Finnhub API key is set
-echo "[1/6] Checking Finnhub API key..."
-if grep -q "YOUR_FINNHUB_API_KEY" data_collector_btc.py; then
+echo "[1/7] Checking .env file..."
+if [ ! -f "../.env" ]; then
     echo ""
-    echo "WARNING: Finnhub API key not set!"
-    echo "Please edit data_collector_btc.py and replace YOUR_FINNHUB_API_KEY with your actual API key"
+    echo "WARNING: .env file not found!"
+    echo "Creating .env from .env.example..."
+    cp ../.env.example ../.env
+    echo ""
+    echo "Please edit .env and set your FINNHUB_API_KEY"
+    echo "Example: nano ../.env"
     echo ""
     read -p "Press Enter after you've set your API key, or Ctrl+C to cancel..."
 fi
 
-echo ""
-echo "[2/6] Installing WebSocket dependencies..."
-pip3 install websocket-client==1.6.4 --break-system-packages
+# Validate API key is set
+if grep -q "your_finnhub_api_key_here" ../.env; then
+    echo ""
+    echo "ERROR: FINNHUB_API_KEY not configured in .env file!"
+    echo "Please edit ../.env and set your actual Finnhub API key"
+    exit 1
+fi
 
 echo ""
-echo "[3/6] Creating data directory..."
+echo "[2/7] Installing Python dependencies..."
+pip3 install python-dotenv==1.0.0 websocket-client==1.6.4 --break-system-packages
+
+echo ""
+echo "[3/7] Creating data directory..."
 mkdir -p /var/lib/sva_iran_assets
 mkdir -p /var/log
 
 echo ""
-echo "[4/6] Copying BTC collector..."
+echo "[4/7] Copying .env file..."
+cp ../.env /opt/sva_iran_assets/
+
+echo ""
+echo "[5/7] Copying BTC collector..."
 cp data_collector_btc.py /opt/sva_iran_assets/server/
 chmod +x /opt/sva_iran_assets/server/data_collector_btc.py
 
 echo ""
-echo "[5/6] Installing systemd service..."
+echo "[6/7] Installing systemd service..."
 cp sva-cvd-btc.service /etc/systemd/system/
 systemctl daemon-reload
 
 echo ""
-echo "[6/6] Starting BTC CVD collector..."
+echo "[7/7] Starting BTC CVD collector..."
 systemctl enable sva-cvd-btc
 systemctl start sva-cvd-btc
 

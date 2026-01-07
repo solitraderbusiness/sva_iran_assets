@@ -6,6 +6,7 @@ const CONFIG = {
     USE_REAL_CVD: true,  // Set to false to use estimated CVD
     AUTO_REFRESH: true,  // Auto-refresh chart data
     REFRESH_INTERVAL: 10000,  // Refresh every 10 seconds (10000ms)
+    FINNHUB_API_KEY: 'YOUR_FINNHUB_API_KEY',  // Replace with your Finnhub API key
 };
 
 class TradingChart {
@@ -93,6 +94,11 @@ class TradingChart {
             this.loadData();
         });
 
+        document.getElementById('assetSelect').addEventListener('change', (e) => {
+            this.currentAsset = e.target.value;
+            this.loadData();
+        });
+
         document.getElementById('timeframeSelect').addEventListener('change', (e) => {
             this.timeframe = e.target.value;
             this.loadData();
@@ -117,55 +123,104 @@ class TradingChart {
         this.setStatus('Loading data...', 'info');
 
         try {
-            // Calculate time range (last 200 candles)
-            const to = Math.floor(Date.now() / 1000);
-            const intervalSeconds = this.getIntervalSeconds();
-            const from = to - (200 * intervalSeconds);
-
-            // Map timeframe to Nobitex resolution
-            const resolutionMap = {
-                '1m': '1',
-                '5m': '5',
-                '15m': '15',
-                '1h': '60',
-                '4h': '240',
-                '1d': 'D'
-            };
-            const resolution = resolutionMap[this.timeframe] || '15';
-
-            // Fetch real OHLCV data from Nobitex
-            const url = `https://apiv2.nobitex.ir/market/udf/history?symbol=USDTIRT&resolution=${resolution}&from=${from}&to=${to}`;
-            console.log('Fetching from Nobitex API:', url);
-
-            const response = await fetch(url);
-
-            if (!response.ok) {
-                throw new Error('API not available');
-            }
-
-            const data = await response.json();
-            console.log('API data received:', data);
-
-            if (data.s === 'ok' && data.t && data.t.length > 0) {
-                this.processRealData(data);
+            if (this.currentAsset === 'BTCUSDT') {
+                // Load BTC data from Finnhub
+                await this.loadBTCData();
             } else {
-                throw new Error('No data returned from API');
+                // Load USDT/IRT data from Nobitex
+                await this.loadNobitexData();
             }
+
+            console.log('Generated', this.candleData.length, 'candles');
+
+            // Load real CVD data from server if enabled (only for USDT/IRT)
+            if (this.useRealCVD && this.currentAsset === 'USDTIRT') {
+                await this.loadRealCVD();
+            }
+
+            this.updatePriceDisplay();
+            this.setStatus('Data loaded successfully', 'success');
 
         } catch (error) {
-            console.log('Using mock data (API error):', error.message);
+            console.log('Error loading data:', error.message);
             this.generateMockData();
+            this.updatePriceDisplay();
+            this.setStatus('Error loading data, using mock data', 'error');
+        }
+    }
+
+    async loadNobitexData() {
+        // Calculate time range (last 200 candles)
+        const to = Math.floor(Date.now() / 1000);
+        const intervalSeconds = this.getIntervalSeconds();
+        const from = to - (200 * intervalSeconds);
+
+        // Map timeframe to Nobitex resolution
+        const resolutionMap = {
+            '1m': '1',
+            '5m': '5',
+            '15m': '15',
+            '1h': '60',
+            '4h': '240',
+            '1d': 'D'
+        };
+        const resolution = resolutionMap[this.timeframe] || '15';
+
+        // Fetch real OHLCV data from Nobitex
+        const url = `https://apiv2.nobitex.ir/market/udf/history?symbol=USDTIRT&resolution=${resolution}&from=${from}&to=${to}`;
+        console.log('Fetching from Nobitex API:', url);
+
+        const response = await fetch(url);
+
+        if (!response.ok) {
+            throw new Error('Nobitex API not available');
         }
 
-        console.log('Generated', this.candleData.length, 'candles');
+        const data = await response.json();
+        console.log('Nobitex API data received:', data);
 
-        // Load real CVD data from server if enabled
-        if (this.useRealCVD) {
-            await this.loadRealCVD();
+        if (data.s === 'ok' && data.t && data.t.length > 0) {
+            this.processRealData(data);
+        } else {
+            throw new Error('No data returned from Nobitex API');
+        }
+    }
+
+    async loadBTCData() {
+        // Calculate time range (last 200 candles)
+        const to = Math.floor(Date.now() / 1000);
+        const intervalSeconds = this.getIntervalSeconds();
+        const from = to - (200 * intervalSeconds);
+
+        // Map timeframe to Finnhub resolution
+        const resolutionMap = {
+            '1m': '1',
+            '5m': '5',
+            '15m': '15',
+            '1h': '60',
+            '4h': '240',
+            '1d': 'D'
+        };
+        const resolution = resolutionMap[this.timeframe] || '15';
+
+        // Fetch BTC/USDT data from Finnhub
+        const url = `https://finnhub.io/api/v1/crypto/candle?symbol=OANDA:BTC_USD&resolution=${resolution}&from=${from}&to=${to}&token=${CONFIG.FINNHUB_API_KEY}`;
+        console.log('Fetching from Finnhub API:', url);
+
+        const response = await fetch(url);
+
+        if (!response.ok) {
+            throw new Error('Finnhub API not available');
         }
 
-        this.updatePriceDisplay();
-        this.setStatus('Data loaded successfully', 'success');
+        const data = await response.json();
+        console.log('Finnhub API data received:', data);
+
+        if (data.s === 'ok' && data.t && data.t.length > 0) {
+            this.processRealData(data);
+        } else {
+            throw new Error('No data returned from Finnhub API');
+        }
     }
 
     async loadRealCVD() {
@@ -545,12 +600,21 @@ class TradingChart {
         const change = currentPrice - previousCandle.close;
         const changePercent = (change / previousCandle.close) * 100;
 
-        document.getElementById('currentPrice').textContent =
-            currentPrice.toLocaleString('fa-IR') + ' ریال';
+        // Format price based on selected asset
+        let priceText;
+        let changeText;
+        if (this.currentAsset === 'BTCUSDT') {
+            priceText = '$' + currentPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            changeText = `${change >= 0 ? '+' : ''}$${Math.abs(change).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (${changePercent.toFixed(2)}%)`;
+        } else {
+            priceText = currentPrice.toLocaleString('fa-IR') + ' ریال';
+            changeText = `${change >= 0 ? '+' : ''}${change.toLocaleString('fa-IR')} (${changePercent.toFixed(2)}%)`;
+        }
+
+        document.getElementById('currentPrice').textContent = priceText;
 
         const priceChangeEl = document.getElementById('priceChange');
-        priceChangeEl.textContent =
-            `${change >= 0 ? '+' : ''}${change.toLocaleString('fa-IR')} (${changePercent.toFixed(2)}%)`;
+        priceChangeEl.textContent = changeText;
         priceChangeEl.className = `price-change ${change >= 0 ? 'positive' : 'negative'}`;
     }
 
@@ -746,40 +810,19 @@ hline(0, color=color.gray, linestyle=hline.style_dashed)`;
         try {
             this.isLoading = true;
 
-            // Fetch latest price data
-            const to = Math.floor(Date.now() / 1000);
-            const intervalSeconds = this.getIntervalSeconds();
-            const from = to - (200 * intervalSeconds);
+            // Load data based on current asset
+            if (this.currentAsset === 'BTCUSDT') {
+                await this.loadBTCData();
+            } else {
+                await this.loadNobitexData();
 
-            const resolutionMap = {
-                '1m': '1',
-                '5m': '5',
-                '15m': '15',
-                '1h': '60',
-                '4h': '240',
-                '1d': 'D'
-            };
-            const resolution = resolutionMap[this.timeframe] || '15';
-
-            const url = `https://apiv2.nobitex.ir/market/udf/history?symbol=USDTIRT&resolution=${resolution}&from=${from}&to=${to}`;
-
-            const response = await fetch(url);
-
-            if (response.ok) {
-                const data = await response.json();
-
-                if (data.s === 'ok' && data.t && data.t.length > 0) {
-                    // Update candle data
-                    this.processRealData(data);
-
-                    // Refresh CVD if enabled
-                    if (this.useRealCVD) {
-                        await this.loadRealCVD();
-                    }
-
-                    console.log('Data refreshed successfully');
+                // Refresh CVD if enabled (only for USDT/IRT)
+                if (this.useRealCVD) {
+                    await this.loadRealCVD();
                 }
             }
+
+            console.log('Data refreshed successfully');
 
         } catch (error) {
             console.error('Error refreshing data:', error);

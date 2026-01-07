@@ -133,8 +133,8 @@ class TradingChart {
 
             console.log('Generated', this.candleData.length, 'candles');
 
-            // Load real CVD data from server if enabled (only for USDT/IRT)
-            if (this.useRealCVD && this.currentAsset === 'USDTIRT') {
+            // Load real CVD data from server if enabled (for both USDT/IRT and BTC)
+            if (this.useRealCVD) {
                 await this.loadRealCVD();
             }
 
@@ -225,7 +225,7 @@ class TradingChart {
 
     async loadRealCVD() {
         try {
-            console.log('Fetching real CVD data from server...');
+            console.log(`Fetching real CVD data from server for ${this.currentAsset}...`);
 
             // Calculate time range for CVD data (match candle data range)
             if (this.candleData.length === 0) {
@@ -236,7 +236,7 @@ class TradingChart {
             const fromTime = this.candleData[0].time;
             const toTime = this.candleData[this.candleData.length - 1].time;
 
-            const url = `${CONFIG.CVD_API_URL}/api/cvd?from=${fromTime}&to=${toTime}&limit=10000`;
+            const url = `${CONFIG.CVD_API_URL}/api/cvd?asset=${this.currentAsset}&from=${fromTime}&to=${toTime}&limit=10000`;
             console.log('Fetching CVD from:', url);
 
             const response = await fetch(url);
@@ -815,11 +815,11 @@ hline(0, color=color.gray, linestyle=hline.style_dashed)`;
                 await this.loadBTCData();
             } else {
                 await this.loadNobitexData();
+            }
 
-                // Refresh CVD if enabled (only for USDT/IRT)
-                if (this.useRealCVD) {
-                    await this.loadRealCVD();
-                }
+            // Refresh CVD if enabled (for both assets)
+            if (this.useRealCVD) {
+                await this.loadRealCVD();
             }
 
             console.log('Data refreshed successfully');

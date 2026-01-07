@@ -17,11 +17,13 @@ logger = logging.getLogger(__name__)
 app = Flask(__name__)
 CORS(app)  # Enable CORS for frontend access
 
-DB_PATH = '/var/lib/sva_iran_assets/cvd_data.db'
+DB_PATH_USDT = '/var/lib/sva_iran_assets/cvd_data.db'
+DB_PATH_BTC = '/var/lib/sva_iran_assets/cvd_btc_data.db'
 
-def get_db_connection():
-    """Get database connection"""
-    conn = sqlite3.connect(DB_PATH)
+def get_db_connection(asset='USDTIRT'):
+    """Get database connection based on asset"""
+    db_path = DB_PATH_BTC if asset == 'BTCUSDT' else DB_PATH_USDT
+    conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
     return conn
 
@@ -35,16 +37,18 @@ def get_cvd_data():
     """
     Get CVD data for specified timeframe
     Query params:
+    - asset: USDTIRT or BTCUSDT (default: USDTIRT)
     - from: Unix timestamp (optional)
     - to: Unix timestamp (optional)
     - limit: Max records to return (default: 1000)
     """
     try:
+        asset = request.args.get('asset', default='USDTIRT', type=str)
         from_ts = request.args.get('from', type=int)
         to_ts = request.args.get('to', type=int)
         limit = request.args.get('limit', default=1000, type=int)
 
-        conn = get_db_connection()
+        conn = get_db_connection(asset)
         cursor = conn.cursor()
 
         # Build query
@@ -95,9 +99,14 @@ def get_cvd_data():
 
 @app.route('/api/cvd/latest', methods=['GET'])
 def get_latest_cvd():
-    """Get latest CVD value"""
+    """
+    Get latest CVD value
+    Query params:
+    - asset: USDTIRT or BTCUSDT (default: USDTIRT)
+    """
     try:
-        conn = get_db_connection()
+        asset = request.args.get('asset', default='USDTIRT', type=str)
+        conn = get_db_connection(asset)
         cursor = conn.cursor()
 
         cursor.execute('''
@@ -134,9 +143,14 @@ def get_latest_cvd():
 
 @app.route('/api/stats', methods=['GET'])
 def get_stats():
-    """Get database statistics"""
+    """
+    Get database statistics
+    Query params:
+    - asset: USDTIRT or BTCUSDT (default: USDTIRT)
+    """
     try:
-        conn = get_db_connection()
+        asset = request.args.get('asset', default='USDTIRT', type=str)
+        conn = get_db_connection(asset)
         cursor = conn.cursor()
 
         cursor.execute('SELECT COUNT(*) as count FROM cvd_data')
@@ -165,9 +179,14 @@ def get_stats():
 
 @app.route('/api/debug/recent', methods=['GET'])
 def get_debug_recent():
-    """Get detailed information about recent data for debugging"""
+    """
+    Get detailed information about recent data for debugging
+    Query params:
+    - asset: USDTIRT or BTCUSDT (default: USDTIRT)
+    """
     try:
-        conn = get_db_connection()
+        asset = request.args.get('asset', default='USDTIRT', type=str)
+        conn = get_db_connection(asset)
         cursor = conn.cursor()
 
         # Get last 5 records with full details

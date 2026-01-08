@@ -220,27 +220,28 @@ class TradingChart {
     }
 
     async loadGoldData() {
-        // Fetch gold/coin price from our server (which proxies BRS API to avoid CORS)
-        const url = `${CONFIG.CVD_API_URL}/api/gold`;
+        // Try fetching directly from BRS API (browser can access it)
+        const directUrl = 'https://brsapi.ir/Api/Market/Gold_Currency.php?key=FreeZDf3zdKa6ZlMAb47X27DveTrXIr3';
 
-        console.log('Fetching from Gold API (via server):', url);
+        console.log('Fetching gold prices from BRS API...');
 
-        const response = await fetch(url);
+        try {
+            const response = await fetch(directUrl);
 
-        if (!response.ok) {
-            throw new Error('Gold API not available');
+            if (!response.ok) {
+                throw new Error(`BRS API returned status ${response.status}`);
+            }
+
+            const data = await response.json();
+            console.log('BRS API data received:', data);
+
+            // Generate historical chart data from current price
+            this.generateGoldChartData(data);
+
+        } catch (error) {
+            console.error('Error fetching gold data:', error);
+            throw new Error('Unable to fetch gold prices: ' + error.message);
         }
-
-        const result = await response.json();
-        console.log('Gold API response:', result);
-
-        if (!result.success) {
-            throw new Error(result.error || 'Failed to fetch gold prices');
-        }
-
-        // Generate historical chart data from current price
-        // Since BRS API only provides current prices, we'll create a simple price history
-        this.generateGoldChartData(result.data);
     }
 
     generateGoldChartData(apiData) {

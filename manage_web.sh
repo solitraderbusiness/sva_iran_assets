@@ -5,9 +5,9 @@ case "$1" in
     start)
         echo "Starting web server on port 80..."
         cd /home/user/sva_iran_assets
-        nohup python3 -m http.server 80 > /var/log/sva_web.log 2>&1 &
+        nohup python3 -m http.server 80 --bind 0.0.0.0 > /var/log/sva_web.log 2>&1 &
         echo "Web server started (PID: $!)"
-        echo "Access at: http://$(hostname -I | awk '{print $1}')"
+        echo "Access at: http://31.97.32.203"
         ;;
     stop)
         echo "Stopping web server..."
@@ -22,7 +22,7 @@ case "$1" in
     status)
         if pgrep -f "python3 -m http.server 80" > /dev/null; then
             echo "Web server is running"
-            echo "Access at: http://$(hostname -I | awk '{print $1}')"
+            echo "Access at: http://31.97.32.203"
             ps aux | grep "python3 -m http.server 80" | grep -v grep
         else
             echo "Web server is not running"

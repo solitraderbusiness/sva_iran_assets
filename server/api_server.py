@@ -244,6 +244,43 @@ def get_debug_recent():
             'error': str(e)
         }), 500
 
+@app.route('/api/gold', methods=['GET'])
+def get_gold_prices():
+    """
+    Proxy endpoint for BRS Gold API to avoid CORS issues
+    Fetches current gold and coin prices
+    """
+    try:
+        import requests
+
+        # Fetch from BRS API
+        brs_url = 'https://brsapi.ir/Api/Market/Gold_Currency.php?key=FreeZDf3zdKa6ZlMAb47X27DveTrXIr3'
+
+        logger.info(f"Fetching gold prices from BRS API")
+        response = requests.get(brs_url, timeout=10)
+
+        if response.status_code == 200:
+            data = response.json()
+            logger.info(f"BRS API response: {data}")
+
+            return jsonify({
+                'success': True,
+                'data': data
+            })
+        else:
+            logger.error(f"BRS API returned status {response.status_code}")
+            return jsonify({
+                'success': False,
+                'error': f'BRS API returned status {response.status_code}'
+            }), 502
+
+    except Exception as e:
+        logger.error(f"Error fetching gold prices: {e}", exc_info=True)
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
 if __name__ == '__main__':
     # Configuration from environment variables
     host = os.getenv('API_HOST', '0.0.0.0')
